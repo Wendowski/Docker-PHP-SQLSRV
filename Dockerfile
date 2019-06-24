@@ -1,6 +1,12 @@
-FROM php:7.1-apache
+FROM php:apache
 
 ENV ACCEPT_EULA=Y
+
+#Set Server name
+CMD echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
+#Missing?
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg1 zlib1g-dev
 
 # Microsoft SQL Server Prerequisites
 RUN apt-get update \
@@ -16,12 +22,20 @@ RUN apt-get update \
     && apt-get -y --no-install-recommends install \
         unixodbc-dev \
         msodbcsql17
+        
+RUN docker-php-ext-install pdo \
+    && pecl install sqlsrv pdo_sqlsrv xdebug
+    
+# Memcached for API caching
+RUN apt-get update && apt-get install -y libmemcached-dev \
+    && pecl install memcached \
+    && docker-php-ext-enable memcached
+    
+RUN docker-php-ext-enable sqlsrv pdo_sqlsrv xdebug
 
-RUN docker-php-ext-install mbstring pdo pdo_mysql \
-    && pecl install sqlsrv pdo_sqlsrv xdebug \
-    && docker-php-ext-enable sqlsrv pdo_sqlsrv xdebug
-
-COPY index.php /var/www/html/
+COPY . /var/www/html
+WORKDIR /var/www/html
 
 EXPOSE 80
 
+CMD ["/usr/sbin/apache2ctl", "-DFOREGROUND"]
